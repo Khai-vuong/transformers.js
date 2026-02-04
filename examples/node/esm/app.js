@@ -3,29 +3,22 @@ import http from 'http';
 import querystring from 'querystring';
 import url from 'url';
 
-import { pipeline, env } from '@xenova/transformers';
+import { NLIClassificationPipeline, labels } from './NLI.js';
+// import { FeatureEmbeddedClassifier } from './FeatureEmbedded.js';
+// import { FeatureEmbeddedClassifier } from './FeatureEmbeddedCentroid.js';
+// import { FeatureEmbeddedClassifier } from './ModuleRouter.js';
+import { FeatureEmbeddedClassifier } from './ModuleRouterLong.js';
 
-class MyClassificationPipeline {
-  static task = 'text-classification';
-  static model = 'Xenova/distilbert-base-uncased-finetuned-sst-2-english';
-  static instance = null;
 
-  static async getInstance(progress_callback = null) {
-    if (this.instance === null) {
-
-      // NOTE: Uncomment this to change the cache directory
-      // env.cacheDir = './.cache';
-
-      this.instance = pipeline(this.task, this.model, { progress_callback });
-    }
-
-    return this.instance;
-  }
+// Choose which classifier to use: 'nli' or 'few-shot'
+// const CLASSIFIER_TYPE = 'nli';
+const CLASSIFIER_TYPE = 'few-shot';
+// Pre-load the model
+if (CLASSIFIER_TYPE === 'nli') {
+  NLIClassificationPipeline.getInstance();
+} else {
+  FeatureEmbeddedClassifier.getInstance();
 }
-
-// Comment out this line if you don't want to start loading the model as soon as the server starts.
-// If commented out, the model will be loaded when the first request is received (i.e,. lazily).
-MyClassificationPipeline.getInstance();
 
 // Define the HTTP server
 const server = http.createServer();
@@ -37,24 +30,75 @@ server.on('request', async (req, res) => {
   // Parse the request URL
   const parsedUrl = url.parse(req.url);
 
-  // Extract the query parameters
-  const { text } = querystring.parse(parsedUrl.query);
-
   // Set the response headers
   res.setHeader('Content-Type', 'application/json');
 
   let response;
-  if (parsedUrl.pathname === '/classify' && text) {
-    const classifier = await MyClassificationPipeline.getInstance();
-    response = await classifier(text);
-    res.statusCode = 200;
+  
+  if (parsedUrl.pathname === '/classify' && req.method === 'POST') {
+    // Parse JSON body
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+    
+    req.on('end', async () => {
+      try {
+        const { text, role } = JSON.parse(body);
+        
+        if (text) {
+          // Use the selected classifier
+          if (CLASSIFIER_TYPE === 'nli') {
+            const classifier = await NLIClassificationPipeline.getInstance();
+            response = await classifier(text, labels);
+          } else {
+            response = await FeatureEmbeddedClassifier.classify(text, role);
+          }
+          
+          // Console log the results with percentages
+          console.log('\n=== Classification Results ===');
+          console.log(`Classifier: ${CLASSIFIER_TYPE.toUpperCase()}`);
+          console.log(`Text: "${text}"`);
+          console.log('\nLabel Scores:');
+          
+          // Handle different response formats
+          if (response.decision) {
+            // ModuleRouter format
+            console.log(`\nDecision: ${response.decision}`);
+            console.log(`Threshold: ${(response.threshold * 100).toFixed(0)}%\n`);
+            console.log('All Scores:');
+            response.allScores.forEach(({ category, score }) => {
+              const percentage = (score * 100).toFixed(2);
+              const marker = score >= response.threshold ? '✓' : ' ';
+              console.log(`  ${marker} ${category.padEnd(45)} : ${percentage}%`);
+            });
+          } else if (response.labels && response.scores) {
+            // Standard format (NLI, FeatureEmbedded)
+            response.labels.forEach((label, index) => {
+              const percentage = (response.scores[index] * 100).toFixed(2);
+              console.log(`  ${label.padEnd(50)} : ${percentage}%`);
+            });
+          }
+          console.log('=============================\n');
+          
+          res.statusCode = 200;
+        } else {
+          response = { 'error': 'Missing text field in request body' };
+          res.statusCode = 400;
+        }
+      } catch (error) {
+        response = { 'error': 'Invalid JSON body' };
+        res.statusCode = 400;
+      }
+      
+      // Send the JSON response
+      res.end(JSON.stringify(response));
+    });
   } else {
-    response = { 'error': 'Bad request' }
+    response = { 'error': 'Bad request. Use POST /classify with JSON body' };
     res.statusCode = 400;
+    res.end(JSON.stringify(response));
   }
-
-  // Send the JSON response
-  res.end(JSON.stringify(response));
 });
 
 server.listen(port, hostname, () => {

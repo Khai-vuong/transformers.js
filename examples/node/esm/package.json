@@ -4,6 +4,10 @@
   "description": "Server-side inference with Transformers.js (ESM)",
   "type": "module",
   "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js"
+  },
   "keywords": [],
   "author": "Xenova",
   "license": "ISC",

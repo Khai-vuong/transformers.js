@@ -1,45 +1,5 @@
 import { pipeline, env } from '@xenova/transformers';
-
-// Few-shot examples: provide example texts for each category
-export const fewShotExamples = {
-  'system_configuration': [
-    'Check the server status',
-    'Is the system running properly?',
-    'Monitor the infrastructure health',
-    'What is the uptime of the service?',
-    "What's the current system health status?",
-    'Check the logs for any errors',
-    'How many users are currently online?',
-    'Is the database alive?',
-    'Monitor the CPU and memory usage',
-    'Restart the application server'
-  ],
-  'data_analysis': [
-    'Analyze the scores from class L01',
-    'Show me statistics about student performance in this course',
-    'What are the average grades?',
-    'Generate a report on quiz results',
-    'Compare performance across different classes',
-    'What percentage of students passed the exam?',
-    'Show me the grade distribution for this course',
-    'Analyze the improvement trend over time',
-    'Calculate the median score for the assignment',
-    'Generate analytics dashboard for student progress',
-    'Explain how students usually struggle with limits and derivatives.'
-  ],
-  'quiz_creation': [
-    'Create a quiz about mathematics',
-    'Generate assessment questions for chapter 5',
-    'Design a test for chapter 3',
-    'Make practice questions about photosynthesis',
-    'Design practice problems for calculus',
-    'Create exercises for linear algebra',
-    'Generate practice problems for students',
-    'Make a test about chemistry',
-    'Build assessment questions for physics',
-    'Make a test about history of Vietnam'
-  ]
-};
+import { fewShotExamples } from './fewShotData.js';
 
 export class FeatureEmbeddedClassifier {
   static embeddingModel = 'Xenova/all-MiniLM-L6-v2';

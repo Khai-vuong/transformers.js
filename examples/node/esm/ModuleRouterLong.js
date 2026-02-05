@@ -1,45 +1,5 @@
 import { pipeline, env } from '@xenova/transformers';
-
-// Few-shot examples: provide example texts for each category
-export const fewShotExamples = {
-  'system_configuration': [
-    'Check the server status',
-    'Is the system running properly?',
-    'Monitor the infrastructure health',
-    'What is the uptime of the service?',
-    "What's the current system health status?",
-    'Check the logs for any errors',
-    'How many users are currently online?',
-    'Is the database alive?',
-    'Monitor the CPU and memory usage',
-    'Restart the application server'
-  ],
-  'data_analysis': [
-    'Analyze the scores from class L01',
-    'Show me statistics about student performance in this course',
-    'What are the average grades?',
-    'Generate a report on quiz results',
-    'Compare performance across different classes',
-    'What percentage of students passed the exam?',
-    'Show me the grade distribution for this course',
-    'Analyze the improvement trend over time',
-    'Calculate the median score for the assignment',
-    'Generate analytics dashboard for student progress',
-    'Explain how students usually struggle with limits and derivatives.'
-  ],
-  'quiz_creation': [
-    'Create a quiz about mathematics',
-    'Generate assessment questions for chapter 5',
-    'Design a test for chapter 3',
-    'Make practice questions about photosynthesis',
-    'Design practice problems for calculus',
-    'Create exercises for linear algebra',
-    'Generate practice problems for students',
-    'Make a test about chemistry',
-    'Build assessment questions for physics',
-    'Make a test about history of Vietnam'
-  ]
-};
+import { fewShotExamples } from './fewShotData.js';
 
 export class FeatureEmbeddedClassifier {
   static embeddingModel = 'Xenova/all-MiniLM-L6-v2';
@@ -53,9 +13,9 @@ export class FeatureEmbeddedClassifier {
   static minSentenceLength = 5; // words
   
   // Discourse chunking thresholds
-  static chunkSimilarityThreshold = 0.65; // cosine similarity threshold for grouping sentences into chunks
-  static chunkSignificanceThreshold = 0.25; // minimum score to count as "significant appearance" in coverage
-  static decisionThreshold = 0.30; // minimum score for an intent to be included in results
+  static chunkSimilarityThreshold = 0.7; // cosine similarity threshold for grouping sentences into chunks
+  static chunkSignificanceThreshold = 0.5; // minimum score to count as "significant appearance" in coverage
+  static decisionThreshold = 0.50; // minimum score for an intent to be included in results
   
   // Position weighting - how much to boost later chunks (e.g., 0.5 = 50% boost for last chunk)
   static positionBoost = 0.5;
@@ -210,8 +170,7 @@ export class FeatureEmbeddedClassifier {
 
     // Step 1: Split into sentences
     const sentences = this.splitIntoSentences(text);
-    console.log(`Split into ${sentences.length} sentences`);
-    console.log('------------------------------------------------------------');
+    console.log(`Split into ${sentences.length} sentences \n\n`);
     sentences.forEach((s, i) => console.log(`  [${i}] ${s}`));
     
     if (sentences.length === 0) {
@@ -219,7 +178,7 @@ export class FeatureEmbeddedClassifier {
     }
 
     // Step 2: Compute sentence embeddings and create discourse chunks
-    console.log('\n--- Step 2: Discourse Chunking ---');
+    // console.log('\n--- Step 2: Discourse Chunking ---');
     const sentenceEmbeddings = [];
     for (const sentence of sentences) {
       const embedding = await this.embeddingInstance(sentence, { pooling: 'mean', normalize: true });
@@ -230,6 +189,7 @@ export class FeatureEmbeddedClassifier {
     const chunks = [];
     let currentChunk = [0]; // Start with first sentence
     
+
     for (let i = 1; i < sentences.length; i++) {
       const similarity = this.cosineSimilarity(sentenceEmbeddings[i-1], sentenceEmbeddings[i]);
       console.log(`Similarity [${i-1}]-[${i}]: ${(similarity * 100).toFixed(1)}%`);
@@ -254,7 +214,7 @@ export class FeatureEmbeddedClassifier {
     });
 
     // Step 3: Classify each chunk with category centroids
-    console.log('\n--- Step 3: Classify Each Chunk ---');
+    // console.log('\n--- Step 3: Classify Each Chunk ---');
     const chunkClassifications = [];
     
     for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
@@ -284,7 +244,7 @@ export class FeatureEmbeddedClassifier {
     }
 
     // Step 4: Rank using multiple signals
-    console.log('\n--- Step 4: Aggregate with Ranking Signals ---');
+    // console.log('\n--- Step 4: Aggregate with Ranking Signals ---');
     
     const intentStats = {};
     const categories = Object.keys(this.categoryEmbeddings);
@@ -303,6 +263,17 @@ export class FeatureEmbeddedClassifier {
     for (const classification of chunkClassifications) {
       const positionWeight = 1 + (classification.position * this.positionBoost);
       
+      // Find the winner of this chunk (highest score)
+      let winningCategory = null;
+      let maxScoreInChunk = -1;
+      for (const category of categories) {
+        const score = classification.scores[category];
+        if (score > maxScoreInChunk) {
+          maxScoreInChunk = score;
+          winningCategory = category;
+        }
+      }
+      
       for (const category of categories) {
         const score = classification.scores[category];
         const stats = intentStats[category];
@@ -312,11 +283,14 @@ export class FeatureEmbeddedClassifier {
           stats.maxConfidence = score;
         }
         
-        // Coverage signal - track which chunks this intent appears in
-        stats.chunkAppearances.push({
-          chunkIndex: classification.chunkIndex,
-          score: score
-        });
+        // Coverage signal - only count if this category WON this chunk
+        if (category === winningCategory) {
+          stats.chunkAppearances.push({
+            chunkIndex: classification.chunkIndex,
+            score: score,
+            isWinner: true
+          });
+        }
         
         stats.totalScore += score;
         
@@ -333,11 +307,9 @@ export class FeatureEmbeddedClassifier {
     for (const category of categories) {
       const stats = intentStats[category];
       
-      // Coverage: how many chunks have this intent with meaningful score
-      const significantAppearances = stats.chunkAppearances.filter(
-        app => app.score >= this.chunkSignificanceThreshold
-      ).length;
-      const coverageRatio = significantAppearances / numChunks;
+      // Coverage: how many chunks did this intent WIN (competitive coverage)
+      const chunksWon = stats.chunkAppearances.length; // Only winners are in the array now
+      const coverageRatio = chunksWon / numChunks;
       
       // Combine signals:
       // - Max confidence (40% weight) - strongest signal
@@ -346,19 +318,19 @@ export class FeatureEmbeddedClassifier {
       const avgPositionWeighted = stats.positionWeightedScore / numChunks;
       
       finalScores[category] = 
-        (stats.maxConfidence * 0.4) +
-        (avgPositionWeighted * 0.4) +
-        (coverageRatio * 0.2);
+        (stats.maxConfidence * 0.5) +
+        (avgPositionWeighted * 0.2) +
+        (coverageRatio * 0.3);
       
       console.log(`  ${category}:`);
       console.log(`    Max Confidence: ${(stats.maxConfidence * 100).toFixed(1)}%`);
-      console.log(`    Coverage: ${significantAppearances}/${numChunks} chunks (${(coverageRatio * 100).toFixed(1)}%)`);
+      console.log(`    Coverage (Chunks Won): ${chunksWon}/${numChunks} chunks (${(coverageRatio * 100).toFixed(1)}%)`);
       console.log(`    Position-Weighted Avg: ${(avgPositionWeighted * 100).toFixed(1)}%`);
       console.log(`    Final Score: ${(finalScores[category] * 100).toFixed(1)}%`);
     }
     
     // Step 5: Filter by decision threshold and return sorted list
-    console.log(`\n--- Step 5: Filter & Sort (Threshold: ${(this.decisionThreshold * 100)}%) ---`);
+    // console.log(`\n--- Step 5: Filter & Sort (Threshold: ${(this.decisionThreshold * 100)}%) ---`);
     
     const qualifyingIntents = Object.entries(finalScores)
       .filter(([category, score]) => score >= this.decisionThreshold)
@@ -368,9 +340,7 @@ export class FeatureEmbeddedClassifier {
         score,
         details: {
           maxConfidence: intentStats[category].maxConfidence,
-          coverage: intentStats[category].chunkAppearances.filter(
-            app => app.score >= this.chunkSignificanceThreshold
-          ).length,
+          coverage: intentStats[category].chunkAppearances.length, // Already filtered to winners only
           totalChunks: numChunks
         }
       }));

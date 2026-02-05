@@ -1,58 +1,64 @@
 import { FeatureEmbeddedClassifier } from './ModuleRouterLong.js';
 
-// Test cases with long paragraphs - single intent only
+// Test cases with long paragraphs - single intent only (additional set)
 const longTextTests = [
   {
-    input: `Hi team, the LMS has been slow since Monday and students are reporting timeouts when they submit assignments. 
-    Can you check the server health, review the error logs, and verify the database connection pool settings? 
-    If CPU or memory is spiking, please capture metrics and suggest whether we should scale up during peak hours. 
-    Also, confirm that the nightly backup jobs are still completing successfully.`,
+    input: `The production environment is experiencing severe performance degradation. 
+    We need to immediately investigate the root cause by checking server logs and monitoring CPU utilization. 
+    Please verify that the load balancer is distributing traffic correctly and that none of the application instances are down. 
+    Also review the Redis cache performance and database query execution times. 
+    If necessary, prepare to scale horizontally by adding more container instances.`,
     expected: "system_configuration",
-    description: "Long paragraph about monitoring and fixing LMS infrastructure",
+    description: "Production environment troubleshooting and infrastructure analysis",
     role: "Admin"
   },
   {
-    input: `I want to design a new assessment pack for our biology unit. 
-    Create a quiz on cell division and genetics, then add a second section with short-answer questions about DNA replication. 
-    Finally, give me a few higher-order questions that assess critical thinking rather than memorization.`,
+    input: `I need to prepare comprehensive final exam materials for my physics course. 
+    Start by creating 30 multiple-choice questions covering mechanics, thermodynamics, and electromagnetism. 
+    Then design 5 calculation problems that require students to show their work step by step. 
+    Include a mix of conceptual questions and numerical problems, and make sure to provide detailed answer explanations. 
+    Finally, create a separate practice test with 15 questions for students to use as review material.`,
     expected: "quiz_creation",
-    description: "Long paragraph about building multi-part biology assessments",
+    description: "Comprehensive physics exam creation with multiple components",
     role: "Lecturer"
   },
   {
-    input: `Could you analyze how my students performed in the last two assignments and summarize the trend? 
-    I want the average, median, and a quick distribution by score band, plus a comparison between sections A and B. 
-    If possible, flag any outliers and list students who dropped more than 10 points from the previous quiz.`,
+    input: `I'd like a detailed breakdown of how my two sections performed on the midterm examination. 
+    Start with descriptive statistics including mean, median, mode, and standard deviation for each section. 
+    Then generate a histogram showing the distribution of scores in 10-point intervals. 
+    Identify which questions had the lowest success rate and calculate the item difficulty for each question. 
+    Finally, perform a t-test to determine if there's a statistically significant difference between the two sections.`,
     expected: "data_analysis",
-    description: "Long paragraph about analytics and performance trends",
+    description: "Statistical analysis of midterm exam results with hypothesis testing",
     role: "Lecturer"
   },
   {
-    input: `I'm planning a vacation to Europe next summer. 
-    I want to visit Paris, Rome, and Barcelona, spending about a week in each city. 
-    Can you recommend good hotels that are centrally located? 
-    Also, what's the best time to book flights to get the cheapest prices? 
-    I'm interested in trying authentic local cuisine, so please suggest some restaurants. 
-    What are the must-see attractions in each city? 
-    Should I rent a car or use public transportation?`,
+    input: `Our API gateway has been returning 503 errors intermittently since this morning. 
+    Check the health status of all microservices and verify that the message queue isn't backed up. 
+    Review the recent deployment logs to see if anything changed in the infrastructure configuration. 
+    Monitor the network latency between services and check if any rate limiting is being triggered. 
+    We also need to confirm that the database connection pool hasn't been exhausted.`,
+    expected: "system_configuration",
+    description: "Debugging API gateway errors and microservices health",
+    role: "Admin"
+  },
+  {
+    input: `I'm looking for recommendations on planning a road trip across the United States this summer. 
+    We want to start in New York and make our way to California over three weeks. 
+    What are the must-visit national parks along the way and which route would be most scenic? 
+    Should we book accommodations in advance or find places as we go? 
+    Also, what's the best way to manage a budget for gas, food, and lodging for a family of four? 
+    Any tips on packing essentials for a long road trip?`,
     expected: "outer_api",
-    description: "Long paragraph about vacation planning (unrelated)",
+    description: "Road trip planning across US with route and budget questions",
     role: "Student"
-  },
-  {
-    input: `I'm planning next week's review session and want a structured set of materials. 
-    Please create a 20-question quiz on probability basics, then add a short section of practice problems about conditional probability and Bayes' theorem. 
-    After that, build a separate mini-test for statistics covering mean, variance, and standard deviation, and include an answer key for each part.`,
-    expected: "quiz_creation",
-    description: "Long paragraph focused on generating quizzes and practice problems",
-    role: "Lecturer"
   }
 ];
 
 async function runLongTextTests() {
   console.log('═══════════════════════════════════════════════════════════════');
-  console.log('TESTING LONG TEXT CLASSIFICATION');
-  console.log('With Sentence-Level Analysis and Intent Voting');
+  console.log('TESTING LONG TEXT CLASSIFICATION - SINGLE INTENT SET 2');
+  console.log('Additional test cases with clear single intent');
   console.log('═══════════════════════════════════════════════════════════════\n');
 
   console.log('📋 Test Configuration:');
@@ -108,9 +114,7 @@ async function runLongTextTests() {
 
     // Evaluation
     let evaluation = '';
-    if (testCase.expected === 'mixed') {
-      evaluation = '⚠ MIXED INTENT (multiple categories expected)';
-    } else if (testCase.expected === 'outer_api') {
+    if (testCase.expected === 'outer_api') {
       if (result.decision === 'forward to outer API') {
         evaluation = '✓ CORRECT (Routed to outer API)';
       } else {

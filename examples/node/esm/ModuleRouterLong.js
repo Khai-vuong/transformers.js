@@ -13,7 +13,7 @@ export class FeatureEmbeddedClassifier {
   static minSentenceLength = 5; // words
   
   // Discourse chunking thresholds
-  static chunkSimilarityThreshold = 0.7; // cosine similarity threshold for grouping sentences into chunks
+  static chunkSimilarityThreshold = 0.40; // cosine similarity threshold for grouping sentences into chunks
   static chunkSignificanceThreshold = 0.5; // minimum score to count as "significant appearance" in coverage
   static decisionThreshold = 0.50; // minimum score for an intent to be included in results
   
@@ -226,6 +226,7 @@ export class FeatureEmbeddedClassifier {
       
       // Apply role heuristic
       const boostedScores = this.applyRoleHeuristic(scores, role);
+      // const boostedScores = scores; // Role heuristic will be applied later globally
       
       // Find best category for this chunk
       const sortedScores = Object.entries(boostedScores)
@@ -312,9 +313,9 @@ export class FeatureEmbeddedClassifier {
       const coverageRatio = chunksWon / numChunks;
       
       // Combine signals:
-      // - Max confidence (40% weight) - strongest signal
-      // - Position weighted average (40% weight) - considers call-to-action
-      // - Coverage boost (20% weight) - recurring themes
+      // - Max confidence (50% weight) - strongest signal
+      // - Position weighted average (20% weight) - considers call-to-action
+      // - Coverage boost (30% weight) - recurring themes
       const avgPositionWeighted = stats.positionWeightedScore / numChunks;
       
       finalScores[category] = 
@@ -380,31 +381,49 @@ export class FeatureEmbeddedClassifier {
     }
 
     // Apply role-based heuristic boost
-    const boostedScores = this.applyRoleHeuristic(categoryScores, role);
+    // const boostedScores = this.applyRoleHeuristic(categoryScores, role);
+    const boostedScores = categoryScores; // Role heuristic already applied in long text classification
 
     // Sort categories by boosted score
     const sortedCategories = Object.entries(boostedScores)
       .sort((a, b) => b[1] - a[1])
       .map(([category, score]) => ({ category, score }));
 
-    // Check if the best match meets the threshold
+    // Find all categories that pass the routing threshold
+    const qualifyingCategories = sortedCategories.filter(cat => cat.score >= this.routingThreshold);
+    
+    // Generate decisions array
+    const decisions = qualifyingCategories.length > 0
+      ? qualifyingCategories.map(cat => ({
+          action: `forward to ${cat.category} module`,
+          category: cat.category,
+          score: cat.score
+        }))
+      : [{
+          action: 'forward to outer API',
+          category: 'outer api',
+          score: sortedCategories[0] ? 1.0 - sortedCategories[0].score : 0
+        }];
+
+    // Primary decision (for backward compatibility)
     const topCategory = sortedCategories[0];
     let decision;
     let bestMatch;
 
-    if (topCategory.score >= this.routingThreshold) {
+    if (topCategory && topCategory.score >= this.routingThreshold) {
       // Route to the module
       decision = `forward to ${topCategory.category} module`;
       bestMatch = topCategory;
     } else {
       // Route to outer API
       decision = 'forward to outer API';
-      bestMatch = { category: 'outer api', score: 1.0 - topCategory.score };
+      bestMatch = { category: 'outer api', score: topCategory ? 1.0 - topCategory.score : 0 };
     }
 
     return {
       sequence: text,
-      decision: decision,
+      decision: decision, // Primary decision for backward compatibility
+      decisions: decisions, // All qualifying decisions
       bestMatch: {
         category: bestMatch.category,
         score: bestMatch.score

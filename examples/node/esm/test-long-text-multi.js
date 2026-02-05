@@ -127,28 +127,29 @@ async function runLongTextTests() {
       });
     }
 
-    // Evaluation for multi-intent
+    // Evaluation for multi-intent (order doesn't matter, just check if both are present)
     let evaluation = '';
-    const primaryCorrect = result.decision.includes(testCase.expected.primary);
-    const secondaryDetected = result.allScores.length >= 2 && 
-                              result.allScores[1].score >= result.threshold &&
-                              result.allScores[1].category === testCase.expected.secondary;
+    const qualifyingIntents = result.allScores.filter(s => s.score >= result.threshold);
+    const detectedCategories = qualifyingIntents.map(intent => intent.category);
     
-    if (primaryCorrect && secondaryDetected) {
-      evaluation = `✓ CORRECT - Primary: ${testCase.expected.primary}, Secondary: ${testCase.expected.secondary} detected`;
-    } else if (primaryCorrect && !secondaryDetected) {
-      evaluation = `⚠ PARTIAL - Primary correct (${testCase.expected.primary}), but secondary intent (${testCase.expected.secondary}) not detected above threshold`;
-    } else if (!primaryCorrect && secondaryDetected) {
-      evaluation = `⚠ PARTIAL - Primary incorrect (Expected: ${testCase.expected.primary}, Got: ${result.bestMatch.category}), but secondary detected`;
+    const expectedIntents = [testCase.expected.primary, testCase.expected.secondary];
+    const primaryDetected = detectedCategories.includes(testCase.expected.primary);
+    const secondaryDetected = detectedCategories.includes(testCase.expected.secondary);
+    
+    if (primaryDetected && secondaryDetected) {
+      evaluation = `✓ CORRECT - Both expected intents detected: ${testCase.expected.primary}, ${testCase.expected.secondary}`;
+    } else if (primaryDetected || secondaryDetected) {
+      const detected = primaryDetected ? testCase.expected.primary : testCase.expected.secondary;
+      const missing = primaryDetected ? testCase.expected.secondary : testCase.expected.primary;
+      evaluation = `⚠ PARTIAL - Only ${detected} detected above threshold, missing ${missing}`;
     } else {
-      evaluation = `✗ INCORRECT - Expected primary: ${testCase.expected.primary}, secondary: ${testCase.expected.secondary}. Got: ${result.bestMatch.category}`;
+      evaluation = `✗ INCORRECT - Expected: ${testCase.expected.primary} and ${testCase.expected.secondary}. Got: ${detectedCategories.join(', ') || 'none above threshold'}`;
     }
     
     console.log(`\n${evaluation}`);
     
     // Show detected intents above threshold
-    const qualifyingIntents = result.allScores.filter(s => s.score >= result.threshold);
-    if (qualifyingIntents.length > 1) {
+    if (qualifyingIntents.length >= 1) {
       console.log(`\nDetected ${qualifyingIntents.length} intent(s) above threshold:`);
       qualifyingIntents.forEach((intent, idx) => {
         console.log(`  ${idx + 1}. ${intent.category}: ${(intent.score * 100).toFixed(2)}%`);

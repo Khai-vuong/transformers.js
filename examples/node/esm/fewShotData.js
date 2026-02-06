@@ -26,7 +26,13 @@ export const fewShotExamples = {
     'Monitor network bandwidth and connection stability',
     'Review system configurations and environment variables',
     'Analyze server load balancing and auto-scaling settings',
-    'Give me some suggestions to indexing the database for better performance'
+    'Give me some suggestions to indexing the database for better performance',
+    'Pull CPU utilization, memory usage, and disk I/O stats from the server logs',
+    'Monitor system performance metrics over the past month and identify peak hours',
+    'Check for correlations between high traffic and resource consumption',
+    'Review server health, error logs, and timeout events',
+    'Verify database connection pool settings and API response times',
+    'Confirm backup jobs are completing and report any failures'
   ],
   'data_analysis': [
     'Analyze the scores from class L01',

@@ -7,15 +7,19 @@ export class FeatureEmbeddedClassifier {
   static embeddingInstance = null;
   static summarizationInstance = null;
   static categoryEmbeddings = null;
+  static fewShotTokenCache = null;
   
   // Long text processing thresholds
   static longTextThreshold = 15; // words
   static minSentenceLength = 5; // words
   
   // Discourse chunking thresholds
-  static chunkSimilarityThreshold = 0.40; // cosine similarity threshold for grouping sentences into chunks
-  static chunkSignificanceThreshold = 0.5; // minimum score to count as "significant appearance" in coverage
+  static chunkSimilarityThreshold = 0.4; // cosine similarity threshold for grouping sentences into chunks
+  static chunkSignificanceThreshold = 0.45; // minimum score to count as "significant appearance" in coverage
+  static secondaryCoverageWeight = 0.4; // fractional coverage boost for strong secondary intent
   static decisionThreshold = 0.50; // minimum score for an intent to be included in results
+  
+  static closeToWinnerThreshold = 0.92; // how close to winner to count as strong secondary intents
   
   // Position weighting - how much to boost later chunks (e.g., 0.5 = 50% boost for last chunk)
   static positionBoost = 0.5;
@@ -27,7 +31,7 @@ export class FeatureEmbeddedClassifier {
   static roleCoefficients = {
     'admin': {
       'system_configuration': 0.10,
-      'data_analysis': 0.03,
+      'data_analysis': 0.05,
       'quiz_creation': 0.00
     },
     'lecturer': {
@@ -130,7 +134,44 @@ export class FeatureEmbeddedClassifier {
     return dotProduct; // Vectors are already normalized
   }
 
-  static applyRoleHeuristic(categoryScores, role) {
+  static getFewShotTokenCache() {
+    if (this.fewShotTokenCache) return this.fewShotTokenCache;
+    const cache = {};
+    for (const [category, examples] of Object.entries(fewShotExamples)) {
+      const tokens = new Set();
+      for (const example of examples) {
+        const words = example
+          .toLowerCase()
+          .split(/[^a-z0-9]+/)
+          .filter(w => w.length >= 4);
+        for (const w of words) tokens.add(w);
+      }
+      cache[category] = tokens;
+    }
+    this.fewShotTokenCache = cache;
+    return cache;
+  }
+
+  static hasFewShotOverlap(category, text) {
+    if (!text) return false;
+    const cache = this.getFewShotTokenCache();
+    const tokenSet = cache[category];
+    if (!tokenSet || tokenSet.size === 0) return false;
+    const words = text
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(w => w.length >= 4);
+    let hits = 0;
+    for (const w of words) {
+      if (tokenSet.has(w)) {
+        hits++;
+        if (hits >= 2) return true;
+      }
+    }
+    return false;
+  }
+
+  static applyRoleHeuristic(categoryScores, role, text = null) {
     if (!role) return categoryScores;
     
     const normalizedRole = role.toLowerCase();
@@ -141,12 +182,61 @@ export class FeatureEmbeddedClassifier {
       return categoryScores;
     }
     
+    const minBoostScore = 0.45;
+    const maxBoostScore = 0.08;
+    const minBoostScoreDelta = 0.04;
+    const epsilon = 1e-6;
+    const microBoostFloor = 0.42;
+    const microBoostCeil = 0.45;
+    const microBoostAmount = 0.02;
+    const microBoostTextAmount = 0.02;
+
+    const entries = Object.entries(categoryScores);
+    const sorted = [...entries].sort((a, b) => b[1] - a[1]);
+    const [topCategory, topScore] = sorted[0] || [null, null];
+
+    const desiredBoosts = {};
+    for (const [category, score] of entries) {
+      const coef = coefficients[category] || 0;
+      if (coef > 0 && score >= minBoostScore) {
+        // Map role coefficient to a 4% - 8% boost range.
+        const normalized = Math.min(1, coef / 0.10);
+        desiredBoosts[category] = minBoostScoreDelta + (maxBoostScore - minBoostScoreDelta) * normalized;
+      } else {
+        desiredBoosts[category] = 0;
+      }
+    }
+
+    const topAllowedBoost = topCategory
+      ? desiredBoosts[topCategory]
+      : 0;
+
     const boostedScores = {};
-    for (const [category, score] of Object.entries(categoryScores)) {
-      const boost = coefficients[category] || 0;
+    for (const [category, score] of entries) {
+      let boost = desiredBoosts[category];
+
+      // Preserve ranking: if secondary gets boost x, primary must get at least x.
+      if (category !== topCategory) {
+        boost = Math.min(boost, topAllowedBoost);
+
+        // Do not let any secondary overtake the top category.
+        const maxAllowed = (topScore ?? 0) + topAllowedBoost - score - epsilon;
+        if (maxAllowed < boost) {
+          boost = Math.max(0, maxAllowed);
+        }
+      }
+
       boostedScores[category] = score + boost;
     }
-    
+
+    // Micro boost for top1 near threshold (does not change ranking)
+    if (topCategory && topScore >= microBoostFloor && topScore < microBoostCeil) {
+      boostedScores[topCategory] = boostedScores[topCategory] + microBoostAmount;
+    }
+    if (topCategory && this.hasFewShotOverlap(topCategory, text)) {
+      boostedScores[topCategory] = boostedScores[topCategory] + microBoostTextAmount;
+    }
+
     return boostedScores;
   }
 
@@ -225,7 +315,7 @@ export class FeatureEmbeddedClassifier {
       const scores = await this.classifySingleText(chunkText);
       
       // Apply role heuristic
-      const boostedScores = this.applyRoleHeuristic(scores, role);
+      const boostedScores = this.applyRoleHeuristic(scores, role, chunkText);
       // const boostedScores = scores; // Role heuristic will be applied later globally
       
       // Find best category for this chunk
@@ -255,6 +345,7 @@ export class FeatureEmbeddedClassifier {
       intentStats[category] = {
         maxConfidence: 0,
         chunkAppearances: [],
+        secondaryCoverage: 0,
         totalScore: 0,
         positionWeightedScore: 0
       };
@@ -274,6 +365,10 @@ export class FeatureEmbeddedClassifier {
           winningCategory = category;
         }
       }
+      // Winner takes chunk only if it is significant enough
+      if (maxScoreInChunk < this.chunkSignificanceThreshold) {
+        winningCategory = null;
+      }
       
       for (const category of categories) {
         const score = classification.scores[category];
@@ -285,12 +380,19 @@ export class FeatureEmbeddedClassifier {
         }
         
         // Coverage signal - only count if this category WON this chunk
-        if (category === winningCategory) {
+        if (winningCategory && category === winningCategory) {
           stats.chunkAppearances.push({
             chunkIndex: classification.chunkIndex,
             score: score,
             isWinner: true
           });
+        } else if (
+          winningCategory &&
+          score >= this.chunkSignificanceThreshold &&
+          score >= maxScoreInChunk * this.closeToWinnerThreshold
+        ) {
+          // Strong secondary intent close to winner gets fractional coverage credit
+          stats.secondaryCoverage += this.secondaryCoverageWeight;
         }
         
         stats.totalScore += score;
@@ -310,7 +412,7 @@ export class FeatureEmbeddedClassifier {
       
       // Coverage: how many chunks did this intent WIN (competitive coverage)
       const chunksWon = stats.chunkAppearances.length; // Only winners are in the array now
-      const coverageRatio = chunksWon / numChunks;
+      const coverageRatio = (chunksWon + stats.secondaryCoverage) / numChunks;
       
       // Combine signals:
       // - Max confidence (50% weight) - strongest signal
@@ -381,8 +483,10 @@ export class FeatureEmbeddedClassifier {
     }
 
     // Apply role-based heuristic boost
-    // const boostedScores = this.applyRoleHeuristic(categoryScores, role);
-    const boostedScores = categoryScores; // Role heuristic already applied in long text classification
+    // If long text, role heuristic was already applied during chunk scoring.
+    const boostedScores = wordCount > this.longTextThreshold
+      ? categoryScores
+      : this.applyRoleHeuristic(categoryScores, role, text);
 
     // Sort categories by boosted score
     const sortedCategories = Object.entries(boostedScores)

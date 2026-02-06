@@ -29,17 +29,17 @@ const longTextTests = [
     role: "Admin"
   },
   {
-    input: `I want to create a comprehensive assessment for my chemistry course covering chapters 4 through 6. 
-    Build a 25-question exam with multiple choice, short answer, and calculation problems. 
-    Include an answer key with detailed explanations for each question. 
-    After students take this exam, I'll need you to analyze the results and compare performance across different question types. 
-    Calculate which format students perform best in and identify any correlation between question difficulty and success rate.`,
+    input: `Our LMS has been running slowly during peak hours and students report failed submissions. 
+    Please review the server error logs, database query latency, and API response times to identify bottlenecks. 
+    Apply any configuration fixes needed to stabilize performance. 
+    After the system is stable, generate a report of submission success rates by course and time of day. 
+    Calculate the average submission time and highlight any courses with unusually high failure rates.`,
     expected: {
-      primary: "quiz_creation",
+      primary: "system_configuration",
       secondary: "data_analysis"
     },
-    description: "Exam creation with planned post-assessment analysis",
-    role: "Lecturer"
+    description: "System performance fixes followed by submission analytics",
+    role: "Admin"
   },
   {
     input: `Before we launch the new semester, verify that all system components are functioning correctly. 

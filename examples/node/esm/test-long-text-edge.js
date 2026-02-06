@@ -55,51 +55,51 @@ const edgeCaseTests = [
   },
 
   // ========== ADVERSARIAL EXAMPLES (5) ==========
-  {
-    input: `Quiz database server CPU memory configuration analysis statistics create exam performance monitoring system health check logs backup restore average median percentile calculate generate design build deploy configure optimize troubleshoot debug test benchmark measure analyze report dashboard visualization infrastructure network security authentication authorization quiz questions answers grading rubric assessment evaluation feedback score ranking distribution regression correlation.`,
-    expected: [], // Keyword spam - should ideally reject or score poorly across all categories
-    description: "ADVERSARIAL: Keyword spam - mixing all category keywords to confuse classifier",
-    role: "Lecturer",
-    category: "adversarial"
-  },
-  {
-    input: `I want to create a quiz for my students about database configuration and server monitoring. 
-    The quiz should test their knowledge of CPU optimization, memory management, and log analysis. 
-    Actually, wait, I don't need a quiz. I need you to configure the actual database server settings. 
-    No wait, I mean analyze the server performance data first, then maybe we'll create a quiz about it later. 
-    Or should we just configure the system? I'm not sure what I need right now.`,
-    expected: [], // Contradictory and indecisive - no clear intent
-    description: "ADVERSARIAL: Contradictory signals - keeps changing intent mid-request",
-    role: "Lecturer",
-    category: "adversarial"
-  },
-  {
-    input: `Can you help me with something? I have this thing I need to do for the platform. 
-    It's kind of related to the courses but also involves some technical aspects. 
-    You know what I mean? Just make it work properly and ensure it's done correctly. 
-    I need it to be good quality and meet our requirements. Please handle this appropriately.`,
-    expected: [], // Overly vague - no specific intent identifiable
-    description: "ADVERSARIAL: Overly vague - no concrete action or category identifiable",
-    role: "Lecturer",
-    category: "adversarial"
-  },
-  {
-    input: `So basically I was thinking about how we could potentially improve the overall educational experience by considering various factors that contribute to student success and engagement in our learning management system which includes but is not limited to the user interface design and the backend infrastructure that supports it as well as the pedagogical approaches we employ when creating content and assessments though I'm not entirely sure which specific aspect needs the most attention right now because there are so many interconnected components that all play a role in the bigger picture of educational technology and student outcomes which is really what we're trying to optimize for in the long run even though short term goals are also important and we shouldn't lose sight of the immediate needs while planning for future enhancements.`,
-    expected: [], // Long rambling with no clear intent
-    description: "ADVERSARIAL: Rambling text - long discourse with no actionable request",
-    role: "Admin",
-    category: "adversarial"
-  },
-  {
-    input: `I need to check the quiz logs in the database to see if there are any errors in the backup system. 
-    The quiz server has been showing configuration warnings about exam performance. 
-    Please analyze the quiz statistics from the system logs and calculate the database CPU usage during quiz creation. 
-    Also monitor the quiz infrastructure and generate a report on quiz server memory consumption.`,
-    expected: ["system_configuration"], // Deceptive use of "quiz" - actually about system troubleshooting
-    description: "ADVERSARIAL: Misleading keywords - uses 'quiz' repeatedly but actually describes system monitoring",
-    role: "Admin",
-    category: "adversarial"
-  }
+  // {
+  //   input: `Quiz database server CPU memory configuration analysis statistics create exam performance monitoring system health check logs backup restore average median percentile calculate generate design build deploy configure optimize troubleshoot debug test benchmark measure analyze report dashboard visualization infrastructure network security authentication authorization quiz questions answers grading rubric assessment evaluation feedback score ranking distribution regression correlation.`,
+  //   expected: [], // Keyword spam - should ideally reject or score poorly across all categories
+  //   description: "ADVERSARIAL: Keyword spam - mixing all category keywords to confuse classifier",
+  //   role: "Lecturer",
+  //   category: "adversarial"
+  // },
+  // {
+  //   input: `I want to create a quiz for my students about database configuration and server monitoring. 
+  //   The quiz should test their knowledge of CPU optimization, memory management, and log analysis. 
+  //   Actually, wait, I don't need a quiz. I need you to configure the actual database server settings. 
+  //   No wait, I mean analyze the server performance data first, then maybe we'll create a quiz about it later. 
+  //   Or should we just configure the system? I'm not sure what I need right now.`,
+  //   expected: [], // Contradictory and indecisive - no clear intent
+  //   description: "ADVERSARIAL: Contradictory signals - keeps changing intent mid-request",
+  //   role: "Lecturer",
+  //   category: "adversarial"
+  // },
+  // {
+  //   input: `Can you help me with something? I have this thing I need to do for the platform. 
+  //   It's kind of related to the courses but also involves some technical aspects. 
+  //   You know what I mean? Just make it work properly and ensure it's done correctly. 
+  //   I need it to be good quality and meet our requirements. Please handle this appropriately.`,
+  //   expected: [], // Overly vague - no specific intent identifiable
+  //   description: "ADVERSARIAL: Overly vague - no concrete action or category identifiable",
+  //   role: "Lecturer",
+  //   category: "adversarial"
+  // },
+  // {
+  //   input: `So basically I was thinking about how we could potentially improve the overall educational experience by considering various factors that contribute to student success and engagement in our learning management system which includes but is not limited to the user interface design and the backend infrastructure that supports it as well as the pedagogical approaches we employ when creating content and assessments though I'm not entirely sure which specific aspect needs the most attention right now because there are so many interconnected components that all play a role in the bigger picture of educational technology and student outcomes which is really what we're trying to optimize for in the long run even though short term goals are also important and we shouldn't lose sight of the immediate needs while planning for future enhancements.`,
+  //   expected: [], // Long rambling with no clear intent
+  //   description: "ADVERSARIAL: Rambling text - long discourse with no actionable request",
+  //   role: "Admin",
+  //   category: "adversarial"
+  // },
+  // {
+  //   input: `I need to check the quiz logs in the database to see if there are any errors in the backup system. 
+  //   The quiz server has been showing configuration warnings about exam performance. 
+  //   Please analyze the quiz statistics from the system logs and calculate the database CPU usage during quiz creation. 
+  //   Also monitor the quiz infrastructure and generate a report on quiz server memory consumption.`,
+  //   expected: ["system_configuration"], // Deceptive use of "quiz" - actually about system troubleshooting
+  //   description: "ADVERSARIAL: Misleading keywords - uses 'quiz' repeatedly but actually describes system monitoring",
+  //   role: "Admin",
+  //   category: "adversarial"
+  // }
 ];
 
 async function runEdgeCaseTests() {

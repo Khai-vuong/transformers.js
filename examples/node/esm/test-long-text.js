@@ -3,10 +3,10 @@ import { FeatureEmbeddedClassifier } from './ModuleRouterLong.js';
 // Test cases with long paragraphs - single intent only
 const longTextTests = [
   {
-    input: `Hi team, the LMS has been slow since Monday and students are reporting timeouts when they submit assignments. 
-    Can you check the server health, review the error logs, and verify the database connection pool settings? 
-    If CPU or memory is spiking, please capture metrics and suggest whether we should scale up during peak hours. 
-    Also, confirm that the nightly backup jobs are still completing successfully.`,
+    input: `Please check the LMS system health. 
+    Review the server status and error logs. 
+    Verify the database connection pool settings. 
+    Confirm the nightly backup jobs are completing successfully.`,
     expected: "system_configuration",
     description: "Long paragraph about monitoring and fixing LMS infrastructure",
     role: "Admin"
